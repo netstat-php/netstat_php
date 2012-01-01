@@ -76,6 +76,7 @@ defaults($checks, array(
 // exec command for ping: -l3 (preload) is recommended but
 //defaults($ping_command, 'ping -l3 -c3 -w1 -q'); // might not work everywhere
 defaults($ping_command, 'ping -c3 -w1 -q');
+defaults($ping6_command, 'ping6 -c3 -w1 -q');
 
 // fsockopen timeout; might need adjustment depending on network
 defaults($timeout, 4);
@@ -231,6 +232,21 @@ foreach ($checks as $check)
 		case 'ping': // do an ICMP ping
 			unset($pingoutput);
 			$ping=exec("$ping_command $host",$pingoutput,$pingreturn);
+			if(strlen($ping)>10) 
+			{
+				// strlen($ping)>10 works around a bug in Debian ping (", pipe 3")
+				// http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=456192
+				$status = $online; $diagnostics = "$ping :: $pingreturn"; 
+			}
+			else $diagnostics = "$ping :: $pingreturn";
+			// uncomment this if you want the full output as HTML comment
+			//echo "\n<!-- "; print_r($pingoutput); echo "-->\n";
+			// *nix ping command's return value meanings:
+			// 0: all OK; 1: an error occured; 2: host unknown
+			break;
+		case 'ping6': // do an ICMP ping
+			unset($pingoutput);
+			$ping=exec("$ping6_command $host",$pingoutput,$pingreturn);
 			if(strlen($ping)>10) 
 			{
 				// strlen($ping)>10 works around a bug in Debian ping (", pipe 3")
