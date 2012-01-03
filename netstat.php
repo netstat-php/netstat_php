@@ -20,13 +20,28 @@
  *
  */
 
-// Report no PHP errors (to be safe we include this very early)
+
 
 // Use php netstat.php genconfig to create netstat.conf.php then
 // edit netstat.conf.php with your configuration.  
-error_reporting(0);
+
 
 // ------------------------------------------------- functions part of script
+/**
+ * Catch Exceptions
+ * @param Exception $err
+ */
+function catchExceptions($err){
+	global $config;
+	echo "Error with your request!  Please try again later.  " .
+		"If the problem persists contact <a href=\"".$config['contact']."\">".$config['contact']."</a>.";
+	error_log($err->__toString(),0);
+	exit(1);
+}
+
+// Report no PHP errors (to be safe we include this very early)
+error_reporting(0);
+set_exception_handler('catchExceptions');
 
 /**
  * Defaults for generic config
@@ -56,8 +71,14 @@ function defaultConfig(){
 	
 	// checks (use pipes (|) with care ;)
 	//   syntax: host or IP to check | port | description
-	//     if $port = 'ping' an ICMP ping will be executed
-	//     if $port = 'headline' $host is printed as a headline
+	//     host/IP
+	// 	     IPv6 addresses must be wrapped in brackets eg [2001:db8::1].  If you
+	//       need to check a ssl service like HTTPS, SMTPS, or IMAPS you can use ssl://[2001:db8::1]
+	//     port
+	//       if $port = 'ping' an ICMP ping will be executed
+	//       if $port = 'ping6' an ICMPv6 ping will be executed
+	//       if $port = 'headline' $host is printed as a headline
+	
 	$config['checks'] = array(
 	
 	     'Examples testing localhost |headline',
@@ -148,8 +169,13 @@ EOH;
 	// HTML/page footer
 	$config['htmlfooter'] = "</div>\n</body>\n</html>";
 	
+	// Amount of time to cache the script.  0 to disable.
 	$config['cachetime'] = 5*60;
+	// path to writable directory we can cache in.  Null or false will disable caching.
 	$config['cachepath'] = getcwd() .'/files';
+	
+	// Your support/admin contact address
+	$config['contact'] = 'N/A';
 	return $config;
 }
 
@@ -188,6 +214,10 @@ function genConfig(){
 	$fo=fopen($config['configfile'],'w');
 	if($fo===false) die("Error opening ".$config['configfile']);
 	fwrite($fo, "<?php\n");
+	fwrite($fo, "/*\n");
+	fwrite($fo, " * This file contains the commented defaults.  Feel free to delete\n");
+	fwrite($fo, " * the unused options. \n");
+	fwrite($fo, " */\n");
 	
 	while(($l=fgets($fi,400))!== false){
 		if (trim($l)=='$config=array();'){
@@ -198,7 +228,7 @@ function genConfig(){
 		if(trim($l)=='}' || trim($l)=='return $config;'){
 			break;
 		}
-		fwrite($fo,preg_replace('/\$config\[[\'"]([^\'"]+)[\'"]\]/','\$$1',trim($l))."\n");
+		fwrite($fo,preg_replace('/\$config\[[\'"]([^\'"]+)[\'"]\]/','\$$1',"//".trim($l))."\n");
 	}
 	fclose($fi);
 	fclose($fo);
@@ -222,8 +252,11 @@ EOT;
 
 	if((file_exists($config['alertfile']) && is_writable($config['alertfile'])) || is_writable(dirname($config['alertfile']))){
 		$fp=fopen($config['alertfile'],'w');
+		if($fp===false) die("Error writing alert file!");
 		fwrite($fp, $statusstr);
 		fclose($fp);
+	}else{
+	  die("File Exists/Not Writable");
 	}
 
 }
@@ -257,8 +290,9 @@ function rss(){
 
 /**
  * HTML Code
+ * @param cache Cache object
  */
-function html(){
+function html($cache){
 	global $config;
 	// output HTML/page header
 	echo $config['htmlheader'];
@@ -317,23 +351,12 @@ function html(){
 					. "</td></tr>\n";
 				$output = FALSE; break;
 			case 'ping': // do an ICMP ping
-				unset($pingoutput);
 				$ping=exec("{$config['ping_command']} $host",$pingoutput,$pingreturn);
-				if(strlen($ping)>10) 
-				{
-					// strlen($ping)>10 works around a bug in Debian ping (", pipe 3")
-					// http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=456192
-					$status = $config['online']; $diagnostics = "$ping :: $pingreturn"; 
-				}
-				else $diagnostics = "$ping :: $pingreturn";
-				// uncomment this if you want the full output as HTML comment
-				//echo "\n<!-- "; print_r($pingoutput); echo "-->\n";
-				// *nix ping command's return value meanings:
-				// 0: all OK; 1: an error occured; 2: host unknown
-				break;
+				// This should continue on into ping6 as they share everything but the command. 
 			case 'ping6': // do an ICMP ping
-				unset($pingoutput);
-				$ping=exec("{$config['ping6_command']} $host",$pingoutput,$pingreturn);
+				if(!isset($ping)){
+					$ping=exec("{$config['ping6_command']} $host",$pingoutput,$pingreturn);
+				}
 				if(strlen($ping)>10) 
 				{
 					// strlen($ping)>10 works around a bug in Debian ping (", pipe 3")
@@ -345,6 +368,8 @@ function html(){
 				//echo "\n<!-- "; print_r($pingoutput); echo "-->\n";
 				// *nix ping command's return value meanings:
 				// 0: all OK; 1: an error occured; 2: host unknown
+				unset($pingoutput);
+				unset($ping);
 				break;
 			default: // look if a TCP connection to port can be opened
 				$time_start = microtime(true);
@@ -366,7 +391,7 @@ function html(){
 		// output results
 		if ($output)
 		echo "<tr><td>$description</td><td class=\"$status\" title=\"$diagnostics\">$status</td></tr>\n";
-		flush();
+		$cache->flush();
 	}
 	
 	echo "</table>\n";
@@ -392,33 +417,107 @@ EOT;
  * Class to wrap caching and simplifiy reuse
  */
 class cache{
-	protected $file;
-	protected $time;
-	protected $filetime;
+
+	/**
+	 * @var string
+	 * File to cache in
+	 */
+	private $file;
+
+	/**
+	 * @var string
+	 * Time to keep cache
+	 */
+	private $time;
+
+	/**
+	 * @var int
+	 * Timestamp of cache file. 
+	 */
+	private $filetime;
+	
+	/**
+	 * @var string
+	 * Buffer to store the output in for later caching so the page can be flushed.
+	 */
+	private $buffer='';
+	
+	/**
+	 * @var bool
+	 * If caching is enabled
+	 */
+	private $enabled=false;
+
+	/**
+	 * Constructor
+	 * On new cache() run this
+	 * @param string File to cache in
+	 * @param array The config array
+	 */
 	public function __construct($file, $config){
-		$this->file=$config['cachepath'].'/'.$file;
-		$this->time=$config['cachetime'];
+		if($config['cachepath']!=null && $config['cachepath']!=false && $config['cachetime']>0){
+			// Caching isn't disabled explicitly.  Continue
+			$this->file=$config['cachepath'].'/'.$file;
+			$this->time=$config['cachetime'];
+			if((file_exists($this->file) && is_writable($this->file)) || is_writable(dirname($this->file))){
+					// We can wrte to the cache dirs enable caching.
+					//   No sense caching if we can't write!
+					$this->enabled=true;
+			}
+		}
 	}
-	public function isCached(){
-		$this->filetime=filemtime($this->file);
+	
+	/**
+	 * Check if the file is cached and still valid
+	 * @return bool
+	 */
+	private function isCached(){
+		$this->filetime=@filemtime($this->file);
 		if(file_exists($this->file) && (time() - $this->time <$this->filetime)){
 			return true;
 		}
 		return false;
 	}
+	
+	/**
+	 * Caching Start function.
+	 * If it finds the file is already cached it will return the cached file and 
+	 * exit. Otherwise will ob_start()
+	 */
 	public function start(){
+		if(!$this->enabled)return;
 		if($this->isCached()){
+			// Cache is good.  Return the file and exit!
 			@include $this->file;
 			echo "<!-- Cached ".date('jS F Y H:i', $this->filetime)."-->";
 			exit;
 		}
+		// Need to create cache buffer output.
 		ob_start();
 	}
+	
+	/**
+	 * Store the page to our internal buffer and send the current page contents out.
+	 */
+	public function flush(){
+		// Store the contents
+		$this->buffer.=ob_get_contents();
+		// Flush contents to the browser
+		ob_flush();
+	}
+	
+	/**
+	 * Caching end function
+	 * Writes the output to a file so it is cached for the next requests. 
+	 */
 	public function end(){
+		if(!$this->enabled)return;
 		if((file_exists($this->file) && is_writable($this->file)) || is_writable(dirname($this->file))){
+			// We can write the cache lets get the buffer contents and write it. 
 			$fp=fopen($this->file,'w');
-			fwrite($fp, ob_get_contents());
+			fwrite($fp, $this->buffer . ob_get_contents());
 			fclose($fp);
+			// Close the buffer and send the remaining contents to the browser
 			ob_end_flush();
 		}
 	}
@@ -429,23 +528,33 @@ class cache{
 
 // ------------------------------------------------- controler part of script
 
+// Get the default config
 $config = defaultConfig();
+
+// Check first for genconfig before we try to parseConfig
 if($argv[1] == 'genconfig'){
 	genConfig();
 	exit;
 }
+
+// Parse the user's config
 $config = parseConfig($config['configfile'], $config);
 
 
-
+// Main Controler
 if($_REQUEST['rss'] !== NULL or $argv[1] == 'rss'){
+	// Run rss()
+	// Create instance of cache class.  
 	$cache=new cache('rss.xml',$config);
+	// Start the caching engine
 	$cache->start();
+	// Do the actuall rss function
 	rss();
+	// End the rss engine
 	$cache->end();
 }else if($argv[1] == 'setstatus'){
 	genStatusUpdate();
-}else if($argv[1] == '-h'){
+}else if($argv[1] == '-h' || $argv[1] == '--help'){
 	echo <<<EOT
 {$config['version']} Help
 	rss - Output RSS
@@ -454,9 +563,13 @@ if($_REQUEST['rss'] !== NULL or $argv[1] == 'rss'){
 	
 EOT;
 }else{
+	// Create instance of cache class.  
 	$cache=new cache('index.html',$config);
+	// Start the caching engine
 	$cache->start();
-	html();
+	// Do the actuall html function
+	html($cache);
+	// End the rss engine
 	$cache->end();
 }
 
