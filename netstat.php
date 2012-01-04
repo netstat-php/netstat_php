@@ -49,12 +49,8 @@ set_exception_handler('catchExceptions');
  */
 function defaultConfig(){
 	$config=array();
-	$config['version'] = 
-	'<a href="http://www.fam.tuwien.ac.at/~schamane/sysadmin/netstat/">netstat.php</a> '
-	. 'by <a href="http://www.fam.tuwien.ac.at/~schamane/">Andreas Schamanek</a> '
-	. '~ v0.14 ~ 2009-12-05 ~ '
-	. '<a href="http://www.gnu.org/licenses/gpl.html">GPL licensed</a>';
-	$config['description'] = "Online status of hosts and services provided by netstat.php (c) Andreas Schamanek * http://andreas.schamanek.net";
+	$config['version'] = '~ git master ~ ';
+	$config['description'] = "Online status of hosts and services provided by netstat.php";
 	
 	
 	// below we set up some silly defaults; it is recommended to save your
@@ -459,6 +455,13 @@ class cache{
 			// Caching isn't disabled explicitly.  Continue
 			$this->file=$config['cachepath'].'/'.$file;
 			$this->time=$config['cachetime'];
+
+			// If output_buffering isn't small the progress indicator won't function properly
+			$output_buffering = ini_get("output_buffering");
+			if($config['progressindicator']==TRUE && $output_buffering > 0){
+				error_log("warning: progressindicator incompatible with php.ini output_buffering > 0. Caching disabled! Create a .htaccess with the contents: php_value output_buffering \"0\"");
+				return;
+			}
 			if((file_exists($this->file) && is_writable($this->file)) || is_writable(dirname($this->file))){
 					// We can wrte to the cache dirs enable caching.
 					//   No sense caching if we can't write!
@@ -500,10 +503,14 @@ class cache{
 	 * Store the page to our internal buffer and send the current page contents out.
 	 */
 	public function flush(){
-		// Store the contents
-		$this->buffer.=ob_get_contents();
-		// Flush contents to the browser
-		ob_flush();
+		if($this->enabled){
+			// Store the contents
+			$this->buffer.=ob_get_contents();
+			// Flush contents of the buffer
+			ob_flush();
+		}
+		// Send to browser
+		flush();
 	}
 	
 	/**
