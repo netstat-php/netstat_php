@@ -10,13 +10,18 @@
  * by full-blown monitoring tools anyway and all you want is a simple
  * interface for e.g. users or clients).
  *
+ * This netstat.php has been rewritten and extended by Todd E. Johnson.
+ * It is based on the original netstat 0.x by Andreas Schamanek, still
+ * available at http://www.fam.tuwien.ac.at/~schamane/sysadmin/netstat/
+ *
  * Requirements: fsockopen(), for ICMP pings also exec()
  *
  * (License + History: see also end of file)
  *
+ * @author     Todd E. Johnson <http://www.toddejohnson.net>
  * @author     Andreas Schamanek <http://andreas.schamanek.net>
  * @license    GPL <http://www.gnu.org/licenses/gpl.html>
- * @copyright  (c) 2009 Andreas Schamanek
+ * @copyright  (c) 2012 Todd E. Johnson, Andreas Schamanek
  *
  */
 
@@ -607,6 +612,8 @@ EOT;
  * 0.12 * 2009-11-12  cleaned up and simplified settings mechanism
  * 0.13 * 2009-11-18  $alertfile is only included if larger than 2 bytes
  * 0.14 * 2009-12-05  Default CSS code change to improve font size scaling
+ * 0.15 * 2012-08-04  added ping6 (suggested by Todd Johnson; thanks!)
+ * 1.x  * 2012-..-..  New version by Todd Johnson w/ caching, setstatus, ...
  *
  */
 
