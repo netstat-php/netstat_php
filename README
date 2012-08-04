@@ -1,4 +1,5 @@
 netstat.php - simple network status
+===================================
 
 netstat.php is a PHP script intended to provide a simplified, easily comprehensible and aesthetically pleasing overview of the online status of hosts and services.
 Background story
