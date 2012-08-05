@@ -155,8 +155,8 @@ div#progress { position: fixed; top: 0; left: 0; background: orange; color: blac
 .status_table td { color: #333333; border: 1px solid #444444; padding: 0.4em; }
 .status_table td.headline { font-weight: bolder; background-color: #CFCCCC; padding: 0.4em 0.4em 0.3em 1.5em; }
 .hidden { display: none !important; }
-.{$config['online']} { background-color: #D9FFB3; padding-left: 0.8em; }
-.{$config['offline']} { background-color: #FFB6B6; padding-left: 0.8em; }
+.{$config['online']} { background-color: #D9FFB3; padding-left: 0.8em !important; }
+.{$config['offline']} { background-color: #FFB6B6; padding-left: 0.8em !important; }
 -->
 </style>
 </head>
