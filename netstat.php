@@ -134,9 +134,7 @@ function defaultConfig(){
 	
 	// HTML Header
 	$config['htmlheader'] = <<<EOH
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<!doctype html><html>
 <head>
 <title>{$config['title']}</title>
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-15" />
@@ -154,7 +152,7 @@ h1 { color: #500000; border-bottom: 1px solid #999999; text-align: center; margi
 div#alert { border: 1px solid red; padding: 0.2em 1.5em; margin: 1em 0; }
 div#progress { position: fixed; top: 0; left: 0; background: orange; color: black; padding: 0.2em 1em 0.2em 1em; }
 .status_table { border: 1px solid #333333; border-collapse: collapse; width: 100%; }
-.status_table td { color: #333333; border: 1px solid #444444; }
+.status_table td { color: #333333; border: 1px solid #444444; padding: 0.4em; }
 .status_table td.headline { font-weight: bolder; background-color: #CFCCCC; padding: 0.4em 0.4em 0.3em 1.5em; }
 .hidden { display: none !important; }
 .{$config['online']} { background-color: #D9FFB3; padding-left: 0.8em; }
@@ -324,7 +322,7 @@ function html($cache){
 		echo "<div id=\"progress\">Checks in progress ...</div>\n";
 	}
 	
-	echo "<table class=\"status_table\" cellpadding=\"4\">\n";
+	echo "<table class=\"status_table\">\n";
 	
 	// main loop of checks
 	foreach ($config['checks'] as $check)
