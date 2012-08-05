@@ -319,7 +319,9 @@ function html($cache){
 	}
 	if ($config['progressindicator'])
 	{
-		echo "<div id=\"progress\">Checks in progress ...</div>\n";
+		echo '<script type="text/javascript">
+		document.write("<div id=\"progress\">Checks in progress ...</div>");'
+		."</script>\n";
 	}
 	
 	echo "<table class=\"status_table\">\n";
